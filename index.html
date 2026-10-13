@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Новый пост</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:var(--tg-theme-bg-color,#fff);--fg:var(--tg-theme-text-color,#111);--hint:var(--tg-theme-hint-color,#8a8a8e);--card:var(--tg-theme-secondary-bg-color,#f2f2f7);--accent:var(--tg-theme-link-color,#2481cc);--line:rgba(127,127,127,.25)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:20px 16px 110px;max-width:560px;margin-inline:auto}
+header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+h1{font-size:24px;font-weight:650;letter-spacing:-.02em;margin:0;flex:1}
+.chip{font-size:13px;color:var(--hint);border:1px solid var(--line);border-radius:99px;padding:3px 10px}
+.chip.on{color:var(--fg)}
+.label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--hint);margin:26px 0 8px}
+.label>span:first-child{flex:1}
+button{font:inherit;color:inherit;cursor:pointer}
+.link{background:none;border:0;color:var(--accent);font-size:14px;padding:4px}
+.tool{width:32px;height:28px;border:1px solid var(--line);border-radius:8px;background:none}
+textarea,input{width:100%;font:inherit;color:var(--fg);background:var(--card);border:1px solid transparent;border-radius:12px;padding:12px 14px;outline:none}
+textarea:focus,input:focus{border-color:var(--accent)}
+textarea{min-height:140px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 36px;gap:6px 8px;margin-bottom:12px}
+.row input:nth-child(1){grid-column:1;grid-row:1}
+.row input:nth-child(2){grid-column:1;grid-row:2}
+.x{grid-column:2;grid-row:1/3;border:0;border-radius:12px;background:var(--card);color:var(--hint)}
+.add{width:100%;padding:11px;border:1px dashed var(--line);border-radius:12px;background:none;color:var(--accent)}
+.bubble{background:var(--card);border-radius:16px;overflow:hidden;max-width:420px}
+.m{aspect-ratio:16/9;display:grid;place-items:center;color:var(--hint);font-size:14px;background:repeating-linear-gradient(135deg,transparent 0 10px,var(--line) 10px 11px)}
+.cap{padding:10px 14px;word-break:break-word}
+.cap:empty{display:none}
+.btns{display:grid;gap:4px;padding:0 6px 6px}
+.btns:empty{display:none}
+.btn{text-align:center;padding:10px;border-radius:10px;background:rgba(127,127,127,.18);color:var(--accent);font-weight:600;font-size:15px}
+</style>
+</head>
+<body>
+<header><h1>Новый пост</h1><span class="chip" id="chip"></span><button class="link" id="clr" type="button">Очистить</button></header>
+
+<div class="label"><span>Текст</span>
+  <button class="tool" data-t="b" type="button"><b>B</b></button>
+  <button class="tool" data-t="i" type="button"><i>I</i></button>
+  <span id="cnt"></span></div>
+<textarea id="ta" placeholder="Что напишем?"></textarea>
+
+<div class="label"><span>Кнопки (на всю ширину, до 3)</span></div>
+<div id="rows"></div>
+<button class="add" id="add" type="button">Добавить кнопку</button>
+
+<div class="label"><span>Как будет выглядеть</span></div>
+<div class="bubble"><div class="m" id="m"></div><div class="cap" id="cap"></div><div class="btns" id="btns"></div></div>
+
+<script>
+const tg=window.Telegram&&window.Telegram.WebApp;
+const $=id=>document.getElementById(id);
+const media=new URLSearchParams(location.search).get('media')||'none';
+const names={photo:'Фото',video:'Видео',gif:'GIF'};
+const limit=names[media]?1024:4096;
+const blank=()=>({text:'',buttons:[{t:'',u:''}]});
+let st=blank();
+try{Object.assign(st,JSON.parse(localStorage.getItem('draft')||'{}'))}catch(e){}
+if(!Array.isArray(st.buttons)||!st.buttons.length)st.buttons=[{t:'',u:''}];
+const ta=$('ta');ta.value=st.text||'';
+
+$('chip').textContent=names[media]?'Медиа: '+names[media]:'Без медиа';
+$('chip').className='chip'+(names[media]?' on':'');
+if(names[media])$('m').textContent=names[media];else $('m').style.display='none';
+
+const fmt=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/&lt;(\/?)(b|i)&gt;/g,'<$1$2>').replace(/\n/g,'<br>');
+const vis=s=>s.replace(/<\/?(b|i)>/g,'');
+
+function sync(){
+  st.text=ta.value;
+  const n=vis(st.text).length;
+  $('cnt').textContent=n+' / '+limit;
+  $('cnt').style.color=n>limit?'#e5484d':'';
+  $('cap').innerHTML=fmt(st.text);
+  $('btns').innerHTML='';
+  st.buttons.forEach(b=>{if(b.t.trim()){const d=document.createElement('div');d.className='btn';d.textContent=b.t;$('btns').appendChild(d)}});
+  try{localStorage.setItem('draft',JSON.stringify(st))}catch(e){}
+}
+function rows(){
+  const box=$('rows');box.innerHTML='';
+  st.buttons.forEach((b,i)=>{
+    const r=document.createElement('div');r.className='row';
+    const t=document.createElement('input');t.placeholder='Текст кнопки';t.maxLength=64;t.value=b.t;
+    const u=document.createElement('input');u.placeholder='Ссылка, например https://t.me/channel';u.inputMode='url';u.value=b.u;
+    const x=document.createElement('button');x.type='button';x.className='x';x.textContent='✕';
+    t.oninput=()=>{b.t=t.value;sync()};
+    u.oninput=()=>{b.u=u.value;sync()};
+    x.onclick=()=>{st.buttons.splice(i,1);if(!st.buttons.length)st.buttons=[{t:'',u:''}];rows();sync()};
+    r.append(t,u,x);box.appendChild(r);
+  });
+  $('add').style.display=st.buttons.length>=3?'none':'';
+}
+function wrap(tag){
+  const a=ta.selectionStart,b=ta.selectionEnd,v=ta.value;
+  ta.value=v.slice(0,a)+'<'+tag+'>'+v.slice(a,b)+'</'+tag+'>'+v.slice(b);
+  ta.focus();ta.setSelectionRange(a+tag.length+2,b+tag.length+2);sync();
+}
+document.querySelectorAll('[data-t]').forEach(b=>{b.onmousedown=e=>e.preventDefault();b.onclick=()=>wrap(b.dataset.t)});
+$('add').onclick=()=>{st.buttons.push({t:'',u:''});rows();sync()};
+$('clr').onclick=()=>{st=blank();ta.value='';rows();sync()};
+ta.oninput=sync;
+
+function fail(m){tg?tg.showAlert(m):alert(m)}
+function submit(){
+  const text=ta.value.trim();
+  if(!text&&!names[media])return fail('Добавь текст или пришли боту медиа.');
+  if(vis(text).length>limit)return fail('Текст длиннее '+limit+' символов.');
+  const buttons=[];
+  for(const b of st.buttons){
+    const t=b.t.trim();let u=b.u.trim();
+    if(!t&&!u)continue;
+    if(!t||!u)return fail('У кнопки должны быть и текст, и ссылка.');
+    if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(u))u='https://'+u;
+    if(!/^(https?|tg):\/\//i.test(u))return fail('Ссылка должна начинаться с https://');
+    buttons.push({t,u});
+  }
+  const data=JSON.stringify({text,buttons});
+  if(tg)tg.sendData(data);else alert(data);
+}
+if(tg){tg.ready();tg.expand();tg.MainButton.setText('Создать пост').show().onClick(submit)}
+rows();sync();
+</script>
+</body>
+</html>
